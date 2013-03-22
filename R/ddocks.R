@@ -105,7 +105,8 @@ ddocks_get <- function(con){
 	# collect all data references in the template
 	# organize them by repository, so we can generate one query per repository to request the values
 	#
-	regex = sprintf("%s.*?%s", tokenClose, tokenOpen)
+	regex  = sprintf("%s.*?%s", tokenClose, tokenOpen)
+	regex2 = sprintf("%s([[:graph:]]+)%s", tokenOpen, tokenClose)
 	repeat {
 		
 #		print(sprintf("processing line: %s", line))
@@ -116,7 +117,7 @@ ddocks_get <- function(con){
 		#print(paste("new line: ", line))
 		res <- str_split(line, regex)
 		#print(length(res[[1]]))
-		if (length(res[[1]])>1) {
+		if (length(res[[1]])>1 || (length(greptmp <- grep(regex2, line, value=TRUE))>0 && greptmp[[1]]==line)) {
 			
 			# weird parsing.... but works 
 			for (id in res[[1]]) {

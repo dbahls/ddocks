@@ -4,13 +4,22 @@
 library(ddocks)
 
 
+#dsname  = "data.dj"
+dsname  = "rk.raw"
+
 
 print("reconstruct data set by template")
-ds = ddocks_get(file("samples/koenkerzeileis09/generated/data.dj.ddocks", open = "r"))
+ds = ddocks_get(file(sprintf("samples/koenkerzeileis09/generated/%s.ddocks", dsname), open = "r"))
+
+fileConn<-file("tmp-data.txt")
+writeLines(ds, fileConn)
+close(fileConn)
+
+
 
 
 print("read original data set")
-fileName <- "samples/koenkerzeileis09/data.dj"
+fileName <- sprintf("samples/koenkerzeileis09/%s", dsname)
 orig = readChar(fileName, file.info(fileName)$size)
 
 

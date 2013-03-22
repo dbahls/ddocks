@@ -1,0 +1,100 @@
+###########
+## SETUP ##
+###########
+
+## 1. data-generating process
+dgp <- function(nobs = 100, angle = 0, intensity = 10, 
+  timing = 0.5, coef = c(0, 0), sd = 1)
+{
+  coef <- rep(coef, length.out = 2)
+  delta <- intensity/sqrt(nobs) * c(cos(angle * pi/180), sin(angle * pi/180))
+  err <- rnorm(nobs, sd = sd)
+  x <- rep(c(-1, 1), length.out = nobs)
+  y <- ifelse(seq(along = x)/nobs <= timing,
+         coef[1] + coef[2] * x + err,
+	 (coef[1] + delta[1]) + (coef[2] + delta[2]) * x + err)
+  return(data.frame(y = y, x = x))
+}
+
+## 2. simulate power
+testpower <- function(nrep = 100, size = 0.05,
+  test = c("Rec-CUSUM", "OLS-CUSUM", "Nyblom-Hansen"), ...)
+{
+  pval <- matrix(rep(NA, length(test) * nrep), ncol = length(test))
+  colnames(pval) <- test
+  for(i in 1:nrep) {
+    dat <- dgp(...)
+    compute_pval <- function(test) {
+      test <- match.arg(test, c("Rec-CUSUM", "OLS-CUSUM", "Nyblom-Hansen"))
+      switch(test,
+      "Rec-CUSUM" = sctest(efp(y ~ x, data = dat, type = "Rec-CUSUM"))$p.value,
+      "OLS-CUSUM" = sctest(efp(y ~ x, data = dat, type = "OLS-CUSUM"))$p.value,
+      "Nyblom-Hansen" = sctest(gefp(y ~ x, data = dat, fit = lm),
+        functional = meanL2BB)$p.value)
+    }
+    pval[i,] <- sapply(test, compute_pval)
+  }
+  return(colMeans(pval < size))
+}
+
+## 3. simulation loop
+simulation <- function(intensity = seq(from = 0, to = 10, by = 2.5),
+  timing = c(0.25, 0.5), angle = c(0, 45, 90),
+  test = c("OLS-CUSUM", "Nyblom-Hansen"), ...)
+{
+  prs <- expand.grid(intensity = intensity, timing = timing, angle = angle)
+  nprs <- nrow(prs)
+  ntest <- length(test)
+
+  pow <- matrix(rep(NA, ntest * nprs), ncol = ntest)
+  for(i in 1:nprs) pow[i,] <- testpower(test = test, intensity =
+    prs$intensity[i], timing = prs$timing[i], angle = prs$angle[i], ...)
+
+  rval <- data.frame()
+  rval <- for(i in 1:ntest) rval <- rbind(rval, prs)
+  rval$test <- gl(ntest, nprs, labels = test)
+  rval$power <- as.vector(pow)
+  rval$timing <- factor(rval$timing)
+  rval$angle <- factor(rval$angle)
+  return(rval)
+}
+
+####################
+## RUN & EVALUATE ##
+####################
+
+## 4. run simulation
+library("strucchange")
+set.seed(1090)
+sc_sim <- simulation()
+
+## 5. numerical summary
+tab <- xtabs(power ~ intensity + test + angle + timing, data = sc_sim)
+ftable(tab, row.vars = c("angle", "timing", "test"), col.vars = "intensity")
+
+## 6. graphical summary
+library("lattice")
+trellis.par.set(theme = canonical.theme(color = FALSE))
+xyplot(power ~ intensity | angle + timing, groups = ~ test, data = sc_sim, type = "b")
+
+## 7. save results
+save(sc_sim, file = "sc_sim.rda")
+
+## 8. run extended simulation
+set.seed(1090)
+sc_sim2 <- simulation(nrep = 10000)
+save(sc_sim2, file = "sc_sim2.rda")
+
+################################
+## PLOBERGER & KRAEMER (1992) ##
+################################
+
+set.seed(1090)
+pk_sim <- simulation(nobs = 120, nrep = 1000,
+  intensity = seq(4.8, 12, by = 2.4), timing = seq(0.1, 0.9, by = 0.2),
+  angle = seq(0, 90, by = 18), test = c("Rec-CUSUM", "OLS-CUSUM"))
+
+ftable(xtabs(power ~ intensity + test + angle + timing, data = pk_sim),
+  row.vars = c("test", "timing", "intensity"), col.vars = "angle")
+
+save(pk_sim, file = "pk_sim.rda")

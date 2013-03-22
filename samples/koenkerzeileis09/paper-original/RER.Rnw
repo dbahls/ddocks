@@ -1,0 +1,1392 @@
+\documentclass[10pt,a4paper,twoside]{article}
+
+%% additional packages
+\usepackage[latin1]{inputenc}
+\usepackage{a4wide,graphicx,color,thumbpdf}
+\usepackage{hyperref}
+\usepackage{amsmath}
+
+%% BibTeX settings
+\usepackage[authoryear,round,longnamesfirst]{natbib}
+\bibliographystyle{jae}
+\bibpunct{(}{)}{,}{a}{,}{,}
+
+%% markup commands for code/software
+\let\code=\texttt
+\let\pkg=\textbf
+\let\proglang=\textsf
+\newcommand{\file}[1]{`\code{#1}'}
+\newcommand{\email}[1]{\href{mailto:#1}{\normalfont\texttt{#1}}}
+
+%% markup for comments
+\newcommand{\fixme}[1]{\emph{\marginpar{FIXME} (#1)}}
+\newcommand{\readme}[1]{\emph{\marginpar{README} (#1)}}
+
+%% paragraph formatting
+\setlength{\parskip}{0.5ex plus0.1ex minus0.1ex}
+\setlength{\parindent}{0em}
+\renewcommand{\baselinestretch}{1}
+
+%% \usepackage{Sweave} is essentially
+\RequirePackage[T1]{fontenc}
+\RequirePackage{ae,fancyvrb}
+\DefineVerbatimEnvironment{Sinput}{Verbatim}{fontshape=sl}
+\DefineVerbatimEnvironment{Soutput}{Verbatim}{}
+\DefineVerbatimEnvironment{Scode}{Verbatim}{fontshape=sl}
+\newenvironment{Schunk}{}{}
+\SweaveOpts{engine=R, eps=FALSE, keep.source = TRUE}
+
+%% mimic JAE style
+\renewcommand{\section}{\secdef \mysec \mysecnn}
+\newcommand{\mysec}[2][default]{\vspace{1.7\baselineskip}%
+  \pdfbookmark[1]{#1}{Section.#1}%
+  \refstepcounter{section}%
+  \centerline{\large \thesection. \uppercase{#1}} \vspace{.5\baselineskip}}
+\newcommand{\mysecnn}[1]{\vspace{1.7\baselineskip}%
+  \centerline{\large #1} \vspace{.5\baselineskip}}
+\renewcommand{\abstractname}{\normalfont SUMMARY}
+\renewcommand{\refname}{REFERENCES}
+\renewcommand{\thetable}{\Roman{table}}
+
+%% page header (and currently no footer)
+\usepackage{fancyhdr}
+\setlength{\headheight}{15pt}
+\renewcommand{\headrulewidth}{0pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[CE]{{\normalsize \uppercase{R.~Koenker and A.~Zeileis}}}
+\fancyhead[CO]{{\normalsize \uppercase{Reproducible Econometric Research}}} 
+\fancypagestyle{plain}{
+\fancyhf{}
+}
+
+%% title information
+\title{{\bf Reproducible Econometric Research}\\(A Critical Review of the State of the Art)}
+\author{\hfill Roger Koenker$^a$ \hfill Achim Zeileis$^b$\thanks{Correspondence
+to: Achim Zeileis, Department of Statistics and Mathematics, Wirtschaftsuniversit\"at Wien,
+Augasse 2--6, A--1090 Wien, Austria. E-mail: \email{Achim.Zeileis@wu-wien.ac.at}} \hfill \hfill \\
+{\small \it $^a$ Department of Economics, University of Illinois at Urbana-Champaign, United States of America} \\
+{\small \it $^b$ Department of Statistics and Mathematics, Wirtschaftsuniversit\"at Wien, Austria}}
+\date{}
+
+% hyperref setup
+\definecolor{Red}{rgb}{0.5,0,0}
+\definecolor{Blue}{rgb}{0,0,0.5}
+\hypersetup{%
+  pdftitle = {Reproducible Econometric Research (A Critical Review of the State of the Art)},
+  pdfsubject = {},
+  pdfkeywords = {reproducibility, replication, software, literate programming, literate econometric practice},
+  pdfauthor = {Roger Koenker, Achim Zeileis},
+  %% change colorlinks to false for pretty printing
+  colorlinks = {true},
+  linkcolor = {Blue},
+  citecolor = {Blue},
+  urlcolor = {Red},
+  hyperindex = {true},
+  linktocpage = {true},
+}
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Recent software developments are reviewed from the vantage point of reproducible
+econometric research.  We argue that the emergence of new tools, particularly in
+the open-source community, have greatly eased the burden of documenting and archiving
+both empirical and simulation work in econometrics.  Some of these tools are highlighted
+in the discussion of three small replication exercises.
+\end{abstract}
+
+\noindent {\bf Keywords:} reproducibility, replication, software,
+  literate programming, literate econometric practice.
+
+<<preliminaries, echo=FALSE, results=hide>>=
+library("lattice")
+library("MASS")
+library("lmtest")
+library("sandwich")
+options(prompt = "R> ", continue = "+  ", digits = 4)
+get_version <- function(pkg) gsub("-", "--", packageDescription(pkg)["Version"])
+cleanup <- FALSE
+@
+
+
+
+\section{Introduction} \label{sec:intro}
+
+The renowned dispute between Gauss and Legendre over priority for the
+invention of the method of least squares might have been resolved by
+\cite{repro:Stigler:1981}.  A calculation of the earth's ellipticity
+reported by Gauss in 1799 alluded to the use of {\it meine Methode};
+had Stigler been able to show that Gauss's estimate  was consistent
+with the least squares solution using the four observations available
+to Gauss, his claim that he had been using the method since 1795 would
+have been strongly vindicated.  Unfortunately, no such computation
+could be reproduced leaving the dispute in that limbo all too familiar
+in the computational sciences.  Stigler, deferring to Gauss's legendary
+reputation as a calculator, concludes that Gauss may have estimated  a
+more sophisticated model than the simple first
+order approximation employed by prior researchers, but we may never have
+a conclusive resolution to this puzzle.
+
+The question that we would like to address in this review is this:  200
+hundred years after Gauss, can we do better?  What can be done to
+improve our ability to reproduce computational results in econometrics
+and related fields?  Our main contention is that recent software developments, 
+notably in the open-source community, make it much easier to achieve 
+and distribute reproducible research.  
+
+What do we mean by reproducible
+research?  \cite{repro:Buckheit+Donoho:1995} have defined what
+\cite{repro:deLeeuw:2001} has called \emph{Claerbout's Principle}:
+
+\begin{quote}
+An article about computational science in a scientific publication
+is \emph{not} the scholarship itself, it is merely \emph{advertising}
+of the scholarship. The actual scholarship is the complete software
+development environment and the complete set of instructions which
+generated the figures.
+\end{quote}
+
+See \cite{repro:Schwab+Karrenbach+Claerbout:2000} 
+for an elaboration of this point of view. 
+
+The transition of econometrics from a handicraft industry
+\citep{repro:Wilson:1973,repro:Goldberger:2004}
+to the modern sweatshop of globally interconnected computers
+has been a boon to productivity and innovation, but sometimes
+seems to be a curse.  Who among us expected to be in the ``software
+development'' business?  And yet many of us find ourselves  precisely
+in this position, and those who are not, probably should be.  As
+we will argue below, software development is no longer something  that
+should be left to specialized commercial developers, but instead should
+be an integral part of the artisanal research process.  Effective
+communication of research depends crucially on documentation and
+distribution of related software and data.
+
+Some journals, such as the \emph{Journal of Applied Econometrics}
+(JAE, \url{http://JAE.Wiley.com/}), support authors in this task
+by providing data archives \citep{repro:MacKinnon:2007}. However,
+a more integrated approach encompassing data, software, empirical
+analysis, and documentation is often desirable to facilitate
+replication of results. Section~\ref{sec:software} reviews
+software tools that assist authors in the attempt to make their
+research easily reproducible for themselves and for others. In
+Section~\ref{sec:replication}, the usage of some of these tools
+in practice is illustrated in three small replication exercises. Section~\ref{sec:challenges}
+provides some conclusions and discusses challenges for the future.
+Computational details, necessary for the replication of this paper,
+are summarized in Section~\ref{sec:computational}.
+
+\section{Software Tools} \label{sec:software}
+
+In this section, we review some recent software developments that facilitate a more 
+reproducible approach to econometric research. The tools discussed encompass
+the most common components of econometric practice: from data handling, over
+data analysis in some programming environment, to preparing a document describing
+the results of the analysis. Additionally, we provide information on literate
+programming tools and techniques that enable an integrated approach to these
+three steps, and on software for version control of all components.
+
+\subsection{Version Control} \label{sec:version}
+
+Econometric research on a given project is often carried out over an extended
+period, by several authors, on several computers, so it is hardly surprising
+that we often have difficulty reconstructing exactly what was done.  Files
+proliferate with inconsistent naming conventions, get overwritten or deleted
+or are ultimately archived in a jumble with a sigh of relief when papers are finally
+accepted for publication.  Sometimes, as is the case with JAE papers, a part of the 
+archive is submitted to a central repository, but more often the archive resides
+peacefully on one or more authors' computers until the next disk crash or
+system upgrade.
+
+Such difficulties have long been recognized in major software development
+efforts, but it is only relatively recently that practical version control systems
+have emerged that are well adapted to econometric research.  Many version control
+systems have grown out of the open-source software community where rigorous
+archive cataloging of development efforts involving many participants is
+absolutely essential.  We will briefly describe one such system,
+\pkg{Subversion} (SVN, \url{http://Subversion.Tigris.org/})
+that we have used for this project, 
+see \cite{repro:Pilato+Collins-Sussman+Fitzpatrick:2004}
+for more detailed information. SVN is used for many open-source 
+projects which involve large numbers of developers authorized to make
+changes in base code and documentation.  However, even at the other extreme,
+the individual author toiling in isolation, SVN brings many conveniences and
+the peace of mind in knowing that project file structures and their history
+are safely archived.
+%% one could also say that large multi-author projects such as Apache, the GNU compiler
+%% collection (GCC), the language \proglang{Python} or the desktop environments KDE and
+%% GNOME use it.
+There are many similar systems, notably SVN's widely used predecessor 
+\pkg{CVS} \citep{repro:Cederqvist:2006}, designed for software
+development, but SVN is particularly convenient for managing the combination of text,
+data and software found in most econometrics projects.  Cross-platform
+compatibility is also an important consideration in many projects;
+SVN's basic command-line interface will feel comfortable to most 
+Linux/Unix users, but the graphical clients \pkg{TortoiseSVN} for 
+Windows (\url{http://TortoiseSVN.Tigris.org/}) embedded 
+into the Windows \pkg{Explorer} or  \pkg{svnX} for 
+Mac (\url{http://www.Apple.com/downloads/macosx/development_tools/svnx.html})
+will prove convenient for others.
+
+The first stage of any SVN project involves the creation of a central repository
+for the project.  Once  the repository is created, any of the authorized collaborators
+can ``checkout'' the current version of the project files, update the local copies
+of the files, and make changes, additions or deletions to the files.  At any point,
+the modified  file structure  can be ``committed'' thereby creating a new version
+of the project.  When changes are committed they are recorded in the repository
+as incremental modifications so that all prior versions are still fully accessible
+(even if a file was deleted from the current revision).
+In rare cases that more than one author has modified the same passage of the same
+file, the system prompts authors to reconcile the changes before accepting the
+commitment.  A complete historical record of the project is available at any point in 
+the development process for inspection, search and possible restoration.
+Since modifications are stored as increments, file ``diffs'' in Unix jargon,
+storage requirements for the repository are generally far less severe than for
+prior improvised archiving strategies.  Version numbering is fully automatic,
+so one consistent set of naming conventions for project files can be adhered
+to, thereby avoiding the typical m\'elange of ad hoc files resulting from impromptu
+version control strategies.
+
+If an SVN server is available, setting up an SVN project/repository does not pose many
+technical difficulties: The server administrator just needs create a new repository
+(essentially executing a one-line \code{svnadmin create ...} command) and set
+a few access-control options. After that all users of this SVN just have
+to install the client of their choice (e.g., \pkg{TortoiseSVN}, \pkg{svnX}, see above), check
+out the repository and can already start to add files
+\citep[see][Chapter~2]{repro:Pilato+Collins-Sussman+Fitzpatrick:2004}. 
+Only if no SVN server is available, the setup requires some more technical work.
+It is not un-similar to setting up a Web server but can be a lot easier than that
+depending on the network protocol chosen for communication
+\citep[see][Chapter~6]{repro:Pilato+Collins-Sussman+Fitzpatrick:2004}. As one
+SVN server can easily host many SVN projects/repositories, the individual researcher
+can often avoid setting up a server alone, especially if the university/departments
+already provides such a server, typically along with other Web services.\footnote{For software-related
+projects, there are also various Web sites that host free SVNs, e.g.,
+\url{http://SourceForge.net/}, \url{http://Code.Google.com/},
+and \url{http://R-Forge.R-project.org/} among others.}
+
+\subsection{Data Technologies and Data Archiving} \label{sec:data}
+
+%% 1. flat data
+In the beginning data was flat, representable as matrices, and easily storable in
+text files.\footnote{Easily stored need not imply easily retrieved, as anyone with 
+with a drawer full of floppy disks or a collection of magnetic tapes 
+is undoubtedly aware.} As data has become more plentiful it has also become
+more structurally complex.
+%% 2. DBMS
+Relational database management systems (DBMSs) are still
+quite exotic in econometrics, but seem likely to become more commonplace.
+Stable, well-documented databases with proper version control are critical to
+the reproducibility goal. 
+%% 3. Web-based formats
+In many cases, data archives for individual projects can be most efficiently
+represented by software describing selection rules from publicly available
+data sources, like the Panel Study on Income Dynamics (PSID) and the US
+Census Bureau. Such data sources often provide their contents via the World
+Wide Web (WWW), either using one of the data technologies above or new standards
+such as \proglang{XML} or \proglang{PHP} that emerged with the WWW.
+However, as we stress in Section~\ref{sec:growth} regarding the Penn World Tables,
+reproducibility of such data retrieval strategies relies heavily on future access to
+current versions of the database.
+
+%% 1. flat data
+If the data to be stored is not too complex and/or large, a flat plain text file
+is almost ideal for reproducibility (and hence also used for most publications in the
+JAE data archive): it is portable across platforms, many software
+packages can read and write text files and they can be efficiently archived, e.g.,
+in an SVN repository.
+
+%% 2. DBMS
+For larger data sets, it may be useful or even necessary to store the data
+in a DBMS. Many candidates are available here, but most use
+some form of the \proglang{SQL} (structured query language) developed at IBM in the 1970s.  From
+a reproducibility standpoint it is important to maintain cross-platform compatability
+and minimize licensing costs.  Given these objectives, the 
+open-source candidates \pkg{PostgreSQL} (\url{http://www.PostgreSQL.org/}) and
+\pkg{MySQL} (\url{http://MySQL.com/}) are the obvious candidates.
+
+%% 3. Web-based formats
+In addition to the data technologies above, other new standards have emerged,
+especially for sharing data across the WWW. These include 
+\proglang{XML} \citep[extensible markup language,][]{repro:Bray+Paoli+SperbergMcQueen:2006}:
+a text-based format,
+well-suited for storing both data and meta-information, which is therefore used
+as the basis for many other data and text formats. A key feature of \proglang{XML}
+is that it is an open standard, maintained by an international consortium.
+In contrast to many proprietary formats which are often altered
+periodically\footnote{There is an obvious incentive
+for commercial software developers to do so in to effort to bind existing users to 
+systems that have exclusive capabilities. \proglang{SAS} and Microsoft have used
+these strategies particularly effectively.}, data formats based on such a standard
+have a higher likelihood of remaining accessible in the future. 
+
+%% 4. further remarks
+Although not a data technology in the narrower sense, an important method of
+data retrieval (especially in replication tasks) is optical character recognition
+(OCR). Increasingly, previously published data is available electronically
+(e.g., in JPEG or PDF format) and can be extracted automatically using OCR software.
+Adopting such an approach, it is crucial to have a well-documented protocol
+describing the path from the original sources to analyzed data.  A simple example
+of this sort is available in the data archive for \cite{repro:Koenker:2006},
+available from \url{http://www.econ.uiuc.edu/~roger/research/frechet/}.
+In this case, the final version of the data is made available in three distinct
+formats: first, as scanned JPEG images of the original tables as published in 1873,
+second as text files after optical character recognition in the same format as the
+original tables, and third as a documented \proglang{R} data frame stored
+as an \proglang{R} binary data file. Code to transform the raw data into final form
+for analysis was conveniently incorporated into the documentation of the dataset.
+%% One advantage of the \proglang{R} environment
+%% is that it provides good tools for data manipulation, documentation 
+%% and validity checking, as well as a central repository (CRAN) for distributing data
+%% and software through the Web.
+
+Further discussion of data technologies for statistical/scientific applications may
+be found in \cite{repro:Murrell:2009}; a preliminary version of the book is
+available along with further material on the author's Web page at
+\url{http://www.stat.auckland.ac.nz/~paul/ItDT/}.
+
+
+\subsection{Programming Environments} \label{sec:programming}
+
+
+Econometrics has always been a Tower of Babel with many languages, or programming
+environments,  
+competing for attention in the never-ending struggle to communicate effectively
+with machines. Over the course of our disparate careers we have had
+opportunities to explore many of these, including, in approximate chronological order:  
+\proglang{TSP}, \proglang{MIDAS}, \proglang{SAS}, \proglang{Statlib},
+\proglang{GLIM}, \proglang{S}, \proglang{LIMDEP}, \proglang{SHAZAM}, \proglang{GAUSS},
+\proglang{S-PLUS}, \proglang{Lisp-Stat}, \proglang{SPSS}, \proglang{Minitab},
+\proglang{Stata}, \proglang{Ox}, \proglang{MATLAB}, \proglang{Mathematica}, and 
+\proglang{R}. Clearly, these vary considerably in their level of ``programmability'' and
+degree of specialization. Lower-level languages such as \proglang{C} or \proglang{Fortran}
+also play an important role. A historical survey of the early development of econometric software
+may be found in \cite{repro:Renfro:2004}, see also \cite{repro:Ooms+Doornik:2006}. 
+There is also an extensive literature on the individual merits and comparative 
+performance of various forms of statistical software;  see \cite{repro:Baiocchi:2007} 
+for further references, and a more proscriptive review of reproducibility issues.
+Here, we will try to restrict our attention quite narrowly to properties of
+programming environments that might facilitate reproducible research.
+
+\paragraph{Language Structure}
+%% 1. readability
+Software reviews of programming environments often stress speed
+of execution, rather than accuracy, breadth of coverage, or other less tangible
+attributes. This is unfortunate since the exertions of the machine are rarely a
+matter concern, or sympathy. Of more direct relevance in our view is ease of
+writing software (for avoiding errors) and reading software
+(for replication of results).\footnote{For those who believe that computer
+programming should be, like prayer, a private language between the individual
+supplicant and the \emph{deus ex machina}, we recommend 
+\cite{repro:Kernighan+Plauger:1974} who emphasize the need to write programs 
+that other \emph{people} are capable of reading.} The programming language
+should support the user in turning theory into software that reflects how
+we think about the underlying method conceptually. Several language features are 
+helpful in obtaining this goal: functional languages, object orientation, and
+modular programs with re-usable components.
+%% functioncal languages
+Environments for statistical
+computing are gradually moving away from the ``canned soup model'' toward 
+functional languages  that permit fresh ingredients to be assembled in a more flexible
+manner. Formulae specification for linear and nonlinear models, and unified  
+interfaces for general linear models constitutes two developments that have
+brought software and theoretical specification of models closer together.  
+%% object orientation
+Combining such an approach with object orientation allows one to encapsulate
+complex structures (such as a fitted regression models) and define typical
+tasks for them (such as inference or visualization). Programs or analyses
+written in such a way are more intelligible and hence easier to reproduce.
+%% re-usability
+Furthermore, it is highly desirable to have a single environment within which
+to conduct empirical analyses and simulation studies. Re-using the same functionality 
+across different tasks assures better consistency and avoids duplication of programming effort.
+But environments designed for the convenience of empirical analysis may not provide
+good simulation environments, and vice-versa. Also, to assure reproducibility
+and re-usability by other authors, the structural features of a language should
+facilitate (and not suppress) the ability to build on innovations of prior authors.  
+%% further comments
+Exploiting common structure in problems
+often leads to general software solutions that facilitate critical comparison
+of various methods as illustrated for structural change testing
+in \cite{repro:Zeileis:2006a}. The modern trend toward functional
+languages and object-orientation is visible in several of the currently 
+successful econometrics environments.
+\proglang{MATLAB} \citep[\url{http://www.MathWorks.com/}]{repro:MATLAB:2007},
+\proglang{Ox} \citep[\url{http://www.doornik.com/ox/}]{repro:Ox:2006} and
+\proglang{R} \citep[\url{http://www.R-project.org/}]{repro:R:2007}
+are notable in this respect.  
+
+\paragraph{Open Sources}
+Languages are acquired by mimicry so it is extremely valuable to have access to a
+large body of text written by those proficient in the language.  This is one of
+the prime advantages of open-source software projects. 
+When we first embark on a new econometric project, we have at our fingertips an 
+extensive body of existing code, some of which will be directly useful as building 
+blocks---provided that the language is structured to facilitate such modularity---and
+some code will offer only stylistic hints.  In either case, adapting prior code
+when available from reliable sources is almost always preferable to reinventing
+the wheel---and, as argued above, increases the readability and intelligibility 
+of the resulting programs.
+%%
+Most languages now offer some form of forum for sharing code across different
+projects, and thus provide access to an existing body of tested code. An
+exemplary approach is the Comprehensive \proglang{R} Archive Network
+(CRAN, \url{http://CRAN.R-project.org/}) that hosts more than 1,200 software
+packages (containing code, data, and documentation) which are checked on 
+a daily basis on several platforms.
+%% GAUSS: http://www.american.edu/academic.depts/cas/econ/gaussres/GAUSSIDX.HTM
+In addition to such open platforms for user-contributed code,
+there are also a few journals publishing peer-reviewed software, e.g.,
+\emph{The Stata Journal} (\url{http://www.Stata-Journal.com/}) and the
+\emph{Journal of Statistical Software} (\url{http://www.JStatSoft.org/}).
+%%
+Furthermore, even commercial software producers usually provide some functionality written in
+the language itself and therefore open to inspection and emulation for the individual user.  
+\proglang{MATLAB} and \proglang{Stata} \citep[\url{http://www.Stata.com/}]{repro:Stata:2007}
+are notable in this respect. However, even in these favorable circumstances 
+one may eventually wish to dig below the surface only to discover that crucial
+elements of the story are accessible only in the binary form readable only
+by machines.  At this point the computations become a black box visible only
+to the select few, and scientific trust becomes a leap of faith.
+Source code is itself the ultimate form of documentation for computational
+science, when it is well written it can serve as an inspiration for subsequent
+work, when it is flawed, but accessible, then it can be much more easily 
+subjected to necessary critical scrutiny.\footnote{   This is the essential strength
+of scientific discourse captured Piet Hein's grook:  ``The road to wisdom?  Well
+it's plain and simple to express:  Err and err and err again, but less, and less
+and less.''}  With computational methods, gradual refinement is seriously impeded
+unless source code is open.
+
+\paragraph{Language Interfaces}
+To combine the convenience of high-level programming environments with 
+the efficiency of compiled languages, it is desirable to either (byte-)compile
+program code directly or to be able to link code written in lower-level
+languages like \proglang{Fortran} or \proglang{C} and their dialects.
+Most modern languages employed in econometrics---including \proglang{MATLAB},
+\proglang{Ox}, \proglang{R}, and \proglang{Stata}---offer some means
+for ordinary users to accomplish this sort of sorcery. Doing so in ways that
+are platform independent is a considerable challenge. From a reproducibility
+perspective, it should be assured that even code interfacing lower level languages
+behaves consistently across platforms with differing hardware and operating systems.
+This problem is particularly acute in simulation settings where it is often
+desirable to be able to reproduce sequences pseudo-random numbers across machines
+and operating systems. \proglang{R} is notable for assuring reproducibility
+of random number generator results across platforms and versions of the software.
+ 
+\paragraph{Environmental Stability}
+Since hardware and software environments for econometric research are constantly
+evolving, a major challenge for reproducibility involves proper documentation of 
+the environment used to conduct the computational component of the project.  Ideally,
+in our view, authors and journals should be expected to provide a section similar to
+Section~\ref{sec:computational} (``Computational Details'') of the present paper
+describing in some detail the software and hardware environment employed. 
+Even when these environments are completely specified, it is likely to be difficult
+several years later to restore
+a prior version of the environment.  In this respect, again, the open-source
+community is exemplary, since prior versions are typically archived and easily
+downloadable.  In \proglang{R}, for example, all prior versions of the base
+system and its contributed packages are readily available from CRAN.
+For commercial software prior versions are sometimes difficult to obtain due to
+licensing and distribution constraints; \cite{repro:Zeileis+Kleiber:2005} describes 
+an exercise in ``forensic econometrics'' exploring the evolution of the evaluation
+of the Gaussian distribution function in successive versions of
+\proglang{GAUSS} \citep[\url{http://www.Aptech.com/}]{repro:GAUSS:2006}.
+Such investigations are obviously handicapped by the unavailability of older versions
+and lack of adequate documentation of algorithms and their evolution.
+
+%\pkg{OxMetrics} (\url{http://www.OxMetrics.net/}) \cite{repro:OxMetrics:2006}
+%and the reviews by \cite{repro:Cribari-Neto+Zarkos:1999} and \cite{repro:Racine+Hyndman:2002}
+
+
+\subsection{Document Preparation Systems} \label{sec:document}
+
+{\TeX} and {\LaTeX} have become the \emph{lingua franca} for the composition 
+of mathematical text in general and econometric text in particular.
+{\TeX} (\url{http://www.TUG.org/}) developed by \cite{repro:Knuth:1984}
+beginning in the late 1970s constitutes an exceptional case study in 
+software development and the effectiveness of the gradual refinement process 
+of open-source projects.  
+%% Since the release of Version  3 in 1989, {\TeX}
+%% versions have been designated by adding successive decimal digits of the number $\pi$.
+%% As of this writing the current version is 3.141592, and Knuth has provided that 
+%% at his death the final version change will be to change the version number to
+%% $\pi$ ``at which point all remaining bugs will become features.'' 
+{\LaTeX} (\url{http://www.LaTeX-project.org/}), originally written by  \cite{repro:Lamport:1994},
+still constitutes an ongoing development effort to build a higher level markup
+language on the super-structure provided by {\TeX}.  Nevertheless, {\LaTeX} is also
+a remarkably stable environment and serves as a convenient and portable format
+across many platforms for a wide variety of documents. 
+%% Often {\LaTeX} can be
+%% viewed as an intermediate stage of the document preparation process as we will
+%% describe in the next section. 
+%% And although the original intent of these systems was digital typesetting, they
+%% are increasingly used for generating Web-based applications.
+
+Although these systems are clearly state of the art in econometric document
+preparation, casual users of document preparation systems often prefer to avoid
+the somewhat steeper learning curve of {\LaTeX} in favor of \emph{WYSIWYG}
+(what you see is what you get) text processors such as Microsoft's \pkg{Word}
+(\url{http://www.Office2007.com/}) or \pkg{OpenOffice.org} (\url{http://www.OpenOffice.org/}).
+To avoid a general
+discussion about the relative merits of {\LaTeX} over WYSIWYG processors, we focus
+on the perspective of reproducibility: Especially \pkg{Word}'s proprietary binary document
+format is problematic in this respect as its documents are less stable across platforms or
+versions of \pkg{Word}. With the advent of the open-source suite \pkg{OpenOffice.org}
+the situation improved considerably as it not only introduced an \proglang{XML}-based
+open document file format (ODF) for WYSIWYG documents but also supports export to 
+a number of older proprietary file formats.\footnote{Whereas ODF is an ISO standard
+(ISO 26300) Microsoft has not yet succeeded in establishing its own \proglang{XML}-based
+standard, see \url{http://www.iso.org/iso/pressrelease.htm?refid=Ref1070}.}
+
+For Web-based publishing, documents are typically written in \proglang{HTML}
+\citep[hypertext markup language, \url{http://www.w3.org/}, see][]{repro:Raggett+LeHors+Jacobs:1999}
+or prepared in PDF (portable document format) which can be easily created from both
+{\LaTeX} or \pkg{OpenOffice.org}. \proglang{HTML} is usually preferred for multiple
+linked documents and PDF---although it also provides hyperlinking---for single
+documents.
+
+Thus, in addition to the inevitable {\LaTeX}, there are other open systems and
+standards---fulfilling different purposes---such as ODF and \proglang{HTML} that
+are rather stable across platforms and versions. All of them have in common that
+they are based on a markup language which is particularly useful for assuring
+reproducibility as they can also contain markup for computer programs and data
+analysis (visible or invisible) along with the rest of the document. This is discussed
+in more detail in the following section.
+
+
+\subsection{Literate Programming} \label{sec:literate}
+
+The idea of merging text, documentation and various forms of computer code
+arose from the structured programming discussions of the 1970s and was
+championed by \cite{repro:Knuth:1992} following his initial development of
+{\TeX}.  Literate programming, as this movement has come to be called, 
+encourages a more readable programming style by making the code itself an
+integral part of the documentation. The basic operations on documents 
+containing both code chunks and documentation chunks are known as \emph{tangling} and
+\emph{weaving}: the former strips off the documentation chunks and extracts only
+the code chunks while the latter weaves the code chunks into the documentation,
+typically by adding appropriate markup for display of the code. Following
+\cite{repro:Knuth:1992}, the initial literate programming systems were
+\pkg{WEB} and \pkg{CWEB} for combining \proglang{Pascal} and \proglang{C}
+code, respectively, with {\TeX} documentation. In order to provide a leaner
+and more flexible literate programming system, \cite{repro:Ramsey:1994}
+developed \pkg{noweb}, a set of open-source tools for combining code in
+arbitrary languages and {\LaTeX} documentation. In particular, it provides
+the commands \code{notangle} and \code{noweave} and can be used out of the box
+with the programming languages/environments discussed in Section~\ref{sec:programming}.
+
+Literate programming is an important first step in supporting reproducibility in
+econometric practice but one would like to carry the idea a step further and include not only
+the code but also its results dynamically in a document \citep{repro:Leisch+Rossini:2003}. 
+This idea of \emph{literate econometric practice} seems especially well-suited to statistical
+computing applications where models, data, algorithms and interpretation all coalesce
+to produce scientific documents. Directly linking text with computational procedures
+reduces the likelihood of inconsistencies and facilitates reproducing the same type of
+analysis with an extentended/modified data set or different parameter
+settings.\footnote{Proximity is, of course, no guarantee that text and code will agree; we have all 
+read and probably written commented code for which the comments contradicted the 
+unintended consequences of the code. Indeed, for the original author
+such comments may serve as a way to obscure these unintended consequences,
+allowing him to read the comments, not the code.  See, e.g. the comments
+by Doob in \citet[pp.~308--309]{repro:Snell:1997} on the virtues of random proof reading.}
+\proglang{Mathematica}'s concept of ``notebooks'' is an approach to documents of this type
+where the displayed document can be easily altered by changing the associated \proglang{Mathematica}
+code. Another implementation, more closely modelled after the literate programming ideas
+discussed above, is the \code{Sweave} system of \cite{repro:Leisch:2002} for \proglang{R}.
+Re-using the markup commands of \pkg{noweb}, it allows to create ``revivable'' documents
+containing a tightly coupled bundle of code and documentation. To illustrate this,
+and to try to practice what we preach, the archived version of this paper includes
+a source file \file{RER.Rnw}\footnote{The suffix \file{.Rnw} stands for \proglang{R} and
+\pkg{noweb}.} that includes all of the text as well as all of the code used to generate
+the statistical analyses presented in the next section. The input file is structured
+into code chunks written in \proglang{R} and text chunks written in {\LaTeX} and it
+can be processed in \proglang{R} with the command \verb|Sweave("RER.Rnw")|.
+This extracts the code chunks and executes them in \proglang{R}, produces the associated
+output (either in numerical or graphical form) and weaves them into a 
+{\LaTeX} file (plus graphics files in PDF). This resulting {\LaTeX} file can
+then be processed to PDF by pdf{\LaTeX}. The choice of PDF is specific to our document,
+by default \code{Sweave} generates both PDF and EPS graphics so that it can be processed
+by various flavors of {\LaTeX}. Furthermore, \code{Sweave} can be extended to other
+documentation formats: \pkg{R2HTML} \citep{repro:Lecoutre:2003} provides an \code{Sweave}
+driver for weaving \proglang{R} code and \proglang{HTML} documentation and
+\pkg{odfWeave} \citep{repro:Kuhn:2006} supports mixing \proglang{R} code with ODF
+documentation. The ideas of the \code{Sweave} system are also not restricted to \proglang{R}:
+\cite{repro:Lenth+Hojsgaard:2007} provide infrastructure for dynamic documents
+mixing \proglang{SAS} code with {\LaTeX} documentation.
+As far as we are aware, none of the other environments used in econometrics 
+provide similar facilities, but it would be relatively easy to 
+rectify this.
+
+\section{Replication Case Studies} \label{sec:replication}
+
+In this section, we describe briefly three replication exercises chosen
+to illustrate several aspects of the reproducibility problems discussed above.
+The software tools used are \pkg{Subversion} for version control, flat text files
+for data storage, \proglang{R} for programming and empirical analysis, and {\LaTeX}
+for document preparation. As mentioned above, a literate data analysis approach is
+adopted based on the \code{Sweave} tools. The SVN archive, containing the
+full sources of the document, can be checked out anonymously from
+\url{svn://svn-statmath.wu-wien.ac.at/repro/}. For convenience of non-SVN users,
+there is also an online archive available at
+\url{http://www.econ.uiuc.edu/~roger/research/repro/}.
+
+\subsection{An Empirical Example: Cross-Country Growth Regression} \label{sec:growth}
+
+<<packages, echo=FALSE, results=hide>>=
+library("lmtest")
+library("sandwich")
+@
+
+<<dj-data1, echo=FALSE, results=hide>>=
+dj <- read.table("data.dj", header = TRUE, na.strings = c("-999.0", "-999.00"))
+@
+
+\citet[henceforth DJ]{repro:Durlauf+Johnson:1995} investigate cross-country
+growth behavior based on an extended Solow model suggested in
+\citet[henceforth MRW]{repro:Mankiw+Romer+Weil:1992}. The variables in the growth regression
+model are real GDP per member of working-age population, $Y/L$
+(separately for 1960 and 1985); fraction of real GDP devoted to investment, $I/Y$
+(annual average 1960--1985); growth rate of working-age population, $n$ (annual average 1960--1985);
+fraction of working-age population enrolled in secondary school, $\mathit{SCHOOL}$
+(annual average 1960--1985); and the adult literacy rate, $\mathit{LR}$ in 1960.
+Data for these variables (except $\mathit{LR}$) for \Sexpr{nrow(dj)} countries is printed
+in the appendix of MRW and provided in electronic form in the JAE data archive along
+with DJ (who added $\mathit{LR}$).
+
+The unconstrained extended Solow model suggested by MRW in their Table~V and given by DJ in their
+Equation~7 regresses the GDP growth $\log(Y/L)_{1985} - \log(Y/L)_{1960}$ on initial GDP in logs
+$\log(Y/L)_{1960}$ as well as $\log(I/Y)$, $\log(n + g + \delta)$ (assuming $g + \delta = 0.05$),
+and $\log(\mathit{SCHOOL})$. DJ first fit the model by least squares for all
+\Sexpr{nrow(subset(dj, NONOIL == 1))} non-oil-producing countries (reproducing the 
+model fit of MRW) and subsequently to various subsets of countries---with subset selection based
+on initial output $(Y/L)_{1960}$ and/or literacy $\mathit{LR}_{1960}$---finding multiple
+regimes rather than a single stable set of coefficients.
+
+Here, we aim to reproduce the unconstrained regression results given by DJ in their Table~II and V
+given the sample splits described in the paper. Although this seems to be a rather modest task, it turned
+out to be surprisingly difficult, illustrating some typical pitfalls. We first read the data,
+provided in file \file{data.dj} in the JAE data archive, into \proglang{R}, coding missing values
+as described in the accompanying documentation and subsequently selecting the non-oil-producing
+countries.
+
+<<dj-data>>=
+<<dj-data1>>
+dj <- subset(dj, NONOIL == 1)
+@
+
+The relevant columns in the resulting data set \code{dj} are \code{GDP85},
+\code{GDP60}, \code{IONY}, \code{POPGRO}, \code{SCHOOL}, and \code{LIT60}.
+The last four are described as ratios/fractions, but it was not clear from the
+documentation that they were given in percent. Of course, this is quickly revealed by
+a look at the actual data; and MRW probably used this scaling because it is easier to
+read when printed. However, it remains unclear which scaling of the variables
+was used for model fitting. After first attempting to use the variables as printed, it
+turned out that MRW had scaled all variables back to the unit interval. Thus,
+the model employed by MRW and given in the first column of Table~II in DJ
+can be written in \proglang{R} as the formula
+
+<<dj-mrwmodel>>=
+mrw_model <- I(log(GDP85) - log(GDP60)) ~ log(GDP60) + log(IONY/100) +
+  log(POPGRO/100 + 0.05) + log(SCHOOL/100)
+@
+
+where the response \code{I(log(GDP85) - log(GDP60))} is explained by (\code{\~})
+the four scaled regressors.\footnote{Wrapping the response into \code{I()}
+is necessary for using the \code{-} symbol in its arithmetic meaning (rather than as
+a model formula operator).} This can then be fitted with \proglang{R}'s linear model
+function \code{lm()} to the \code{dj} data set, producing the following regression
+summary:
+
+<<dj-mrw>>=
+dj_mrw <- lm(mrw_model, data = dj)
+summary(dj_mrw)
+@
+
+reproducing coefficient estimates, standard errors, adjusted $\bar R^2$, and the
+residual standard error $\sigma_\varepsilon$ provided in the first column of Table~II in DJ
+(identical to the first column in Table~V of MRW) with only small deviations for some of the
+entries.  Another way in \proglang{R} to extract the same table of coefficients (along with
+standard errors and Wald tests) is \code{coeftest(dj\_mrw)}
+\citep[from package \pkg{lmtest}, see][]{repro:Zeileis+Hothorn:2002}
+which will be used below.
+
+In the next step we want to fit the two other columns of DJ's Table~II, pertaining to
+the same model fitted to two different subsets: DJ employ a low-output/low-literacy
+sample of 42 countries with $(Y/L)_{1960} < 1950$ and $\mathit{LR}_{1960} < 54\%$ and
+the corresponding high-output/high-literacy sample, also consisting of 42 countries. However, when selecting
+these sub-samples and computing their size we obtain
+
+<<dj-select-false>>=
+c(nrow(subset(dj, GDP60 <  1950 & LIT60 <  54)),
+  nrow(subset(dj, GDP60 >= 1950 & LIT60 >= 54)))
+@
+
+showing that either the subset definitions or the sample sizes are misstated in DJ's Table~II.
+Some brute-force search (via all-subsets regression) coupled with some educated guessing, yielded revised 
+cut-offs for model fitting of 1800 and 50\%,
+respectively, yielding the consistent sample sizes, 
+and also model fits as we will see below.
+
+<<dj-select-correct>>=
+c(nrow(subset(dj, GDP60 <  1800 & LIT60 <  50)),
+  nrow(subset(dj, GDP60 >= 1800 & LIT60 >= 50)))
+@
+
+Fitting the same model to these two subsets yields DJ's slope
+coefficients, but the wrong intercepts. After further combinatorial search
+using different logarithm bases and variable scalings it turned out that DJ 
+appear to have employed the model: 
+
+<<dj-model>>=
+dj_model <- I(log(GDP85) - log(GDP60)) ~ log(GDP60) + log(IONY) +
+  log(POPGRO/100 + 0.05) + log(SCHOOL)
+@
+
+i.e., only scaling \code{POPGRO} to the original unit interval but keeping \code{IONY}
+and \code{SCHOOL} in percent. Thus, the intercepts in their Table~II are not comparable
+between the first and the other two columns, while the coefficients of interest are
+unaffected by the scaling. Using the model formula \code{dj\_model}, we can then go on
+and fit the model to both sub-samples:
+
+<<dj-sub1>>=
+dj_sub1 <- lm(dj_model, data = dj, subset = GDP60 <  1800 & LIT60 <  50)
+dj_sub2 <- lm(dj_model, data = dj, subset = GDP60 >= 1800 & LIT60 >= 50)
+@
+
+and perform the Wald test for all coefficients, via,
+
+<<dj-sub1-test>>=
+coeftest(dj_sub1, vcov = sandwich)
+@
+
+which reproduces the results from the second column in their Table~II (with only
+minor deviations). Note that heteroskedasticity-consistent sandwich
+standard errors are used
+\citep[provided by package \pkg{sandwich} in \proglang{R}, see][]{repro:Zeileis:2004,repro:Zeileis:2006}
+whereas conventional standard errors are used for the first MRW column. Analogously, the
+results for \code{dj\_sub2} can be obtained via
+
+<<dj-sub2-test, results=hide>>=
+coeftest(dj_sub2, vcov = sandwich)
+@
+
+<<lm-summary-table, echo=FALSE, results=hide>>=
+## convenience function for extracting from "lm" objects:
+##   coef, se, R^2, sigma
+lmtab <- function(obj, vcov. = vcov, ...) {
+  x <- t(coeftest(obj, vcov. = vcov., ...)[,1:2])
+  x <- structure(as.vector(x), .Names = as.vector(rbind(colnames(x),
+    paste(colnames(x), "SD", sep = "_"))))  
+  c(x, unlist(summary(obj)[c("adj.r.squared", "sigma")]))
+}
+
+## turn summary table into LaTeX representation
+tab2latex <- function(x, nam = NULL, last = 2) {
+  n <- nrow(x) - last
+  rval <- rbind(
+    structure(ifelse(is.na(x[1:n,]), "",
+      paste(c("$", "$("), format(round(x[1:n,], digits = 3), trim = TRUE, nsmall = 3),
+      c("\\phantom{)}$", ")$"), sep = "")), .Dim = dim(x) - c(last, 0)),
+    structure(paste("$", ifelse(is.na(x[-(1:n),]), "",
+      format(round(x[-(1:n),], digits = 2), trim = TRUE, nsmall = 2)),
+      "\\phantom{0)}$", sep = ""), .Dim = c(last, ncol(x))))
+  if(is.null(nam)) nam <- rownames(x)
+  rval <- paste(nam, "&", apply(rval, 1, paste, collapse = " & "), "\\\\")
+  rval[c(n, nrow(x))] <- paste(rval[c(n, nrow(x))], "\\hline")
+  rval
+}
+@
+
+<<dj-summary-table, echo=FALSE, results=hide>>=
+dj_tab <- cbind("mrw" = lmtab(dj_mrw),
+  "sub1" = lmtab(dj_sub1, vcov = sandwich),
+  "sub2" = lmtab(dj_sub2, vcov = sandwich)
+)
+@
+
+\begin{table}[t]
+\caption{\label{tab:dj} Replication of cross-country growth regressions, corresponding to
+models \code{dj\_mrw}, \code{dj\_sub1}, \code{dj\_sub2} with conventional standard errors
+for the first column and sandwich standard errors for the other two.}
+\begin{center}
+\begin{tabular}{lrrr} \hline
+& & $(Y/L)_{1960} < 1800$ & $(Y/L)_{1960} \ge 1800$ \\
+& MRW & $\mathit{LR}_{1960} < 50\%$ & $\mathit{LR}_{1960} \ge 50\%$ \\ \hline
+<<dj-table, echo=FALSE, results=tex>>=
+writeLines(tab2latex(dj_tab, nam = c(
+  c("Constant", "", "$\\log(Y/L)_{1960}$", "", "$\\log(I/L)$", "",
+  "$\\log(n + g + \\delta)$", "", "$\\log(\\mathit{SCHOOL})$", "",
+  "$\\bar R^2$", "$\\sigma_\\varepsilon$"))))
+@
+\end{tabular}
+\end{center}
+\end{table}
+
+for which the output is suppressed here but given in condensed form
+in our Table~\ref{tab:dj} (generated using \code{Sweave()}
+with the models fitted above). 
+
+Thus, we have reproduced DJ's Table~II but only after some effort: cut-offs
+for subset selection are different than those displayed in the table, variable scaling is different
+leading to different intercepts, and the standard errors used vary across columns (although
+DJ state briefly in a footnote that they would use sandwich standard errors). None of this
+changes their results qualitatively, all conclusions drawn 
+from the analysis of DJ are supported. 
+Nevertheless, it would be desirable to avoid such uncertainty both from the author's
+and reader's point of view. Organizing both code and documentation in a single revivable document
+as we suggest in the previous section will assist in this but can, of
+course, not prevent human error. It will, however, be much easier for the authors and readers---provided
+the code is made publicly available---to find the sources of such confusions and untie the knots.
+
+As an epilogue to this example, we would like to speculate about what might have caused 
+this confusion. As stated above, MRW consistently scaled all fraction/ratio variables
+in their models and used conventional standard errors so that we could easily reproduce
+all of their results (up to small deviations) in their Table~I--VI. Possibly, DJ shared
+this experience and therefore simply copied the MRW column from the original paper, overlooking
+that they used a different scaling and different standard errors for the models fitted
+to sub-samples. The cut-offs for high/low output/literacy probably changed slightly over
+the work on the manuscript while the table header remained the same. However, there seems to 
+be something more to it because in their Table~V DJ present results for the model fitted to
+four different sub-samples (determined by recursive partitioning) for which coefficients
+are easily reproduced but conventional standard errors are used in sub-sample~1 and 4 and
+sandwich standard errors in sub-sample~2 and 3. Interestingly, there is another follow-up
+study published in JAE by \cite{repro:Masanjala+Papageorgiou:2004} who use the same data
+set. They used all variables without any scaling---as we did in our first attempt---and
+we could exactly reproduce all their results on this data set. Detailed and
+commented \proglang{R} code for reproducing the regression results from all three studies
+is made available with this manuscript. Finally, \cite{repro:Masanjala+Papageorgiou:2004}
+went on to produce an updated version using data up to 1995 which they constructed from
+the Penn World Table \citep[PWT,][]{repro:Heston+Summers+Aten:2002}, using version 6.0
+rather than 4.0 (used by MRW). This pointed us
+to another question in replication studies: Is it possible not only to reproduce the
+analysis given the data, but also the data itself? We tried this for the PWT~6.0 data but
+it did not seem to be very straightforward. Hence, we conclude this example with the
+recommendation that also some information (or preferably code) should be made available 
+that documents the data pre-processing, especially if it is derived from a standard data
+source such as PWT.
+
+
+\subsection{Another Empirical Example: Wage-Equation Meta-Model} \label{sec:wage}
+
+<<rk-preprocessing, echo=FALSE, results=hide>>=
+## read in raw information
+rk <- readLines("rk.raw")
+n <- length(rk)/2
+
+## process information on model dimension
+mdim <- strsplit(rk[(1:n) * 2], "\t")
+neq <- sapply(mdim, length)
+mdim <- sapply(strsplit(unlist(mdim), ","), rbind)
+
+## process information on publication
+info <- rep(rk[(1:n) * 2 - 1], neq)
+info <- sapply(strsplit(info, "\t"), rbind)
+
+## combine and turn to data.frame
+rk <- data.frame(id = rep(1:n, neq), neq = rep(neq, neq),
+  nreg = as.numeric(mdim[1,]), nobs = as.numeric(mdim[2,]),
+  author = info[1,], journal = info[2,], year = as.numeric(info[3,]),
+  page = as.numeric(gsub("s", "", info[4,])),  subject = factor(info[5,],
+  levels = c("d", "h", "g", "u", "w", "b", "m", "c")))
+levels(rk$subject) <- c("discrimination", "human capital",
+  "general", "unionism", "women")[c(1:5, 1, 3, 3)]
+rk$collection <- factor(rk$journal %in% c("ir", "jpe", "jhr", "ilrr",
+  "aer", "ej", "restat"), levels = c(TRUE, FALSE), labels = c("no", "yes"))
+
+## write as CSV
+write.table(rk, file = "rk.csv", sep = ",", quote = FALSE)
+@
+
+Our second case study in replication reports our experience trying to reproduce
+the empirical results in one of our own papers.  \cite{repro:Koenker:1988} describes
+a meta-analysis of published wage equations intended to explore how parametric
+dimension of econometric models depends upon sample size.  Since this paper
+predated the JAE archive policy, we have had to rely on personal archives, but a
+complete record of the replication exercise will be submitted to the JAE archive,
+and---if accepted---would become the earliest entry in that archive.
+
+The data for the study consists of \Sexpr{nrow(rk)} wage equations from  
+\Sexpr{max(rk$id)} published papers
+in mainstream journals and essay colllections.  In addition to citation information
+and a topic indicator, the sample size and parametric dimension of the model was
+recorded for each equation.  Data was originally entered by hand on 3 by 5 index cards
+and then recorded as an ASCII data file.  Fortunately, this data file and a small
+\proglang{SED}/\proglang{AWK} script to preprocess the data was preserved in easily 
+accessible form.\footnote{For a few agonizing hours it seemed that the only 
+extant version of the data
+resided on a 3M~DC~600A backup tape cartridge, and prospects for reading this tape
+looked rather bleak.}  For convenience, we have also written a brief \proglang{R}
+script replacing the original script and yielding a standard
+comma-separated file \file{rk.csv}.
+ 
+
+The models used for the analysis are standard count data models.  Observations 
+on each wage equation are weighted by the reciprocal of the number of equations, $m$,
+appearing in the paper, so the effective unit of analysis is really the paper not 
+the equation.  The first, and simplest, version of the model, appears in the paper as,
+\[
+  \log \lambda \quad = \quad  \underset{(0.149)}{1.336} ~+~ \underset {(0.017)}{0.235} \log z.
+\]
+where $\lambda$ is Poisson rate parameter, the expected number of parameters $y$ in
+the equation, and $z$ is the sample size.  The parameter of interest is the
+elasticity of parsimony, or \emph{parsity}, the log derivitive of $\lambda$ with respect
+to $z$.   In this case, parsity is constant and equal to about $1/4$ implying
+that parametric dimension increases roughly like the fourth root of the
+sample size.  The paper dutifully reports that the computations were conducted
+using release~3 of the \proglang{GLIM} system \citep{repro:Baker+Nelder:1978}.
+Our first attempt to replicate these results in \proglang{R} invoked the incantation:
+
+<<rk-data+equation1>>=
+rk <- read.csv("rk.csv")
+names(rk)[2:4] <- c("m", "y", "z")
+rk1 <- glm(y ~ log(z), weights = 1/m, family = quasipoisson, data = rk)
+summary(rk1)
+@
+
+<<dispersion, echo=FALSE>>=
+dispersion <- function(object, type = "deviance")
+  sum(residuals(object, type = type)^2)/df.residual(object)
+@
+
+The reader can imagine our relief seeing that the estimated coefficients
+agreed perfectly with the published results, turning to dismay as we observed
+that the standard errors differed by a factor of 
+\Sexpr{round(sqrt(dispersion(rk1, type = "deviance")/dispersion(rk1, type = "pearson")),digits = 3)}.  
+Covariance matrices for the parameters in quasi-Poisson models require 
+an estimated dispersion parameter 
+typically some generalization of a residual sum of squares scaled by the
+residual degrees of freedom. In the text of the paper, this was claimed
+to be the scaled Pearson statistic
+$\hat \sigma_P^2 = (n-p)^{-1} \sum w \cdot (y - \hat y)^2 / \hat y$,
+following the advice offered by \citet[pp.~172--173]{repro:McCullagh+Nelder:1983}.
+Unfortunately, however, the authors of the \proglang{GLIM} system, in their wisdom,  
+chose to use the corresponding \emph{deviance} statistic instead of the 
+Pearson statistic, that is
+they scaled the variance-covariance matrix of the estimated coefficients by
+$\hat \sigma_D^2 = (n-p)^{-1} 2 \sum w \cdot (y \log(y/\hat y) - (y - \hat y))$.
+\proglang{R} adopts the Pearson-based estimate as its default and hence the
+dispersion of \Sexpr{round(dispersion(rk1, type = "pearson"),digits = 2)}
+reported in the summary above does not conform with the estimate of
+\Sexpr{round(dispersion(rk1, type = "deviance"), digits = 2)} reported in the 
+original paper.  It is relatively simple to recalculate the \proglang{R} 
+results using the deviance-based estimate:
+<<rk1-dispersion>>=
+<<dispersion>>
+summary(rk1, dispersion = dispersion(rk1))
+@
+And we see that the standard errors and the reported dispersion estimate
+now agree with the published results.  The lesson
+of this ``conflict of defaults'' is that it is dangerous  to make assumptions about
+what software is doing; more careful reading of the \proglang{GLIM} manual would have
+revealed that deviance residuals were being used and this error could have been
+avoided.
+
+In an effort to explore the sensitivity of this estimate to the specification of the
+functional form of the model, several other models were reported in 
+\cite{repro:Koenker:1988}.  Table~\ref{tab:rk} summarizes our attempt to replicate
+these results.  For each of the four Poisson models we report, in addition to
+coefficients and standard errors, both the Pearson and deviance dispersion estimates
+and an estimate of the parsity parameter  $\pi$ evaluated at $z = 1000$ which is
+roughly the geometric mean of the observations on sample size.  The quadratic-in-logs
+model was very sensitive to a few outlying $z$ observations and two versions of the
+estimates were reported, one for the full sample as Equation~2 and one for a reduced
+sample excluding points with $z > 250,000$, as Equation~3.  Again, replication 
+revealed an error:  the text of the paper  reports that this cut-off  as $500,000$,
+but the yellowing page in the project file folder and the \proglang{GLIM}
+output clearly reveal that $250,000$ was used.  This is a clear case in which a more
+literate style of programming might have prevented the error by enforcing consistency
+between the text and the econometric estimation.  Our use of \code{Sweave}  is one
+way to accomplish this.
+
+<<rk2-3>>=
+rk2 <- glm(y ~ log(z) + I(log(z)^2), weights = 1/m, family = quasipoisson,
+  data = rk)
+rk3 <- glm(y ~ log(z) + I(log(z)^2), weights = 1/m, family = quasipoisson,
+  data = rk, subset = z <= 250000)
+@
+
+The results reported in Table~\ref{tab:rk}  for Equations~1 through 4 agree with the
+published results to the precision reported, except for the coefficient on $\log z$
+in Equation~2 which appears to be an old-fashioned typo\footnote{The parsity
+estimate reported in the paper is consistent with our replicated value rather than
+the published value.}, again something that could be more easily avoided by 
+better integration of text and data analysis.
+
+Two final models employed $\log \log z$ as the only covariate; 
+first in the quasi-Poisson specification and then using the negative binomial
+likelihood. The former, given in Equation~4, can again be reproduced as before
+
+<<rk-equation4>>=
+rk4 <- glm(y ~ log(log(z)), weights = 1/m, family = quasipoisson, data = rk)
+@
+using the same specification of dispersion as above. 
+The negative binomial results in \cite{repro:Koenker:1988} were computed, not
+in \proglang{GLIM}, but with general code written by Richard Spady for maximum
+likelihood estimation and linked to \proglang{S}. The same model can now
+be estimated in \proglang{R} using the \code{glm.nb()} function from the 
+\pkg{MASS} package \citep{repro:Venables+Ripley:2002}. However, due to an inconsistency
+in the weight handling of \code{glm()} and \code{glm.nb()} (the latter assumes weights
+are case weights) it was necessary to weight with \code{max(m)/m} instead of \code{1/m}:
+
+<<rk-negbin>>=
+rk_nb <- glm.nb(y ~ log(log(z)), data = rk, weights = max(m)/m)
+@
+
+For this model, sandwich standard errors were reported based on Spady's 
+estimation of the Hessian and outer-product matrix of the gradient.  Our
+attempt to replicate these results  employed the \proglang{R} \pkg{sandwich}
+package as for the growth regressions in Section~\ref{sec:growth}.\footnote{Note that
+using \code{summary()} here will give misleading results due to the different weight 
+handling.  We have reported this to the package authors and hope that the 
+inconsistency can soon be resolved.}
+
+The results are again shown in condensed form in our Table~\ref{tab:rk}. 
+Comparing these results with the published estimates we find somewhat larger 
+discrepancies than for the quasi-Poisson regressions, but the results are
+remarkably consistent.  We would conjecture that this degree of agreement 
+would be rare in most instances where independent software was used to do
+non-linear maximum likelihood estimation.
+
+<<glm-summary-table, echo=FALSE, results=hide>>=
+## convenience function for extracting from "glm" objects:
+##   coef, se, deviance/pearson dispersion
+glmtab <- function(obj, dispersion. = dispersion(obj), ...) {
+  x <- t(summary(obj, dispersion = dispersion.)$coefficients[,1:2])
+  x <- structure(as.vector(x), .Names = as.vector(rbind(colnames(x), 
+    paste(colnames(x), "SD", sep = "_"))))
+  c(x, "s2_deviance" = dispersion(obj, type = "deviance"),
+    "s2_pearson" = dispersion(obj, type = "pearson"))
+}
+@
+
+<<rk-summary-table, echo=FALSE, results=hide>>=
+## call glmtab(), combine with parsity estimate, match rows
+rk_ltab <- list(
+  "rk1" = c(glmtab(rk1), "pi1000" = as.vector(coef(rk1)[2])),
+  "rk2" = c(glmtab(rk2), "pi1000" = as.vector(coef(rk2)[2] + 2 * coef(rk2)[3] * log(1000))),
+  "rk3" = c(glmtab(rk3), "pi1000" = as.vector(coef(rk3)[2] + 2 * coef(rk3)[3] * log(1000))),
+  "rk4" = c(glmtab(rk4), "pi1000" = as.vector(coef(rk4)[2]/log(1000))),
+  "rk_nb" = lmtab(rk_nb, vcov = sandwich))
+
+rk_tab <- matrix(NA, ncol = 5, nrow = 11)
+rownames(rk_tab) <- unique(unlist(sapply(rk_ltab, names)))[c(1:4, 8:11, 5:7)]
+colnames(rk_tab) <- names(rk_ltab)
+for(i in seq_along(rk_ltab)) rk_tab[names(rk_ltab[[i]]), i] <- rk_ltab[[i]]
+@
+
+\begin{table}[t]
+\caption{\label{tab:rk} Replication of wage-equation meta-models, corresponding
+to \code{rk1}--\code{rk4} and \code{rk\_nb} with deviance-based dispersion
+estimates for the quasi-Poisson models and sandwich standard errors for the negative
+binomial model.}
+\begin{center}
+\begin{tabular}{lrrrrr} \hline
+& \multicolumn{4}{c}{Quasi-Poisson} & Neg-Bin \\
+& \multicolumn{1}{c}{1} & \multicolumn{1}{c}{2} & \multicolumn{1}{c}{3}
+& \multicolumn{1}{c}{4} & \\ \hline
+<<rk-table, echo=FALSE, results=tex>>=
+writeLines(tab2latex(rk_tab, last = 3, nam = c(
+  "Constant", "", "$\\log z$", "", "$(\\log z)^2$", "", "$\\log \\log z$", "",
+  "$\\sigma^2_D$", "$\\sigma^2_P$", "$\\pi(1000)$")))
+@
+\end{tabular}
+\end{center}
+\end{table}
+
+
+\subsection{A Simulation Example: Power of Fluctuation Tests} \label{sec:fluctuation}
+
+Another component of many econometrics papers that is often difficult to reproduce
+involves simulation studies.  For these, replication is usually even harder than for empirical
+analyses because there is typically neither code nor data but only a textual description
+of the simulation setup in the paper. In such descriptions, it happens rather easily
+that not all tiny details of either the data-generating process (DGP) or the analysis
+methods are spelled out. Making readable code available along with the manuscript would alleviate
+this task because code is often less clumsy than words, especially for the small details.
+One could ask the question why readers would want to re-run the code given that it is not
+unusual that it takes days or even weeks to obtain the results. The answer is that, even without
+re-running the whole simulation, code
+for the DGP would be useful to re-use similar designs in follow-up publications,
+the code for the analysis methods would give insight into how exactly the methods under study
+were applied to the data (e.g., which ``flavor'' of a particular test was used or which
+measures of performance, etc.).
+
+To illustrate how useful building blocks for carrying out simulation studies could be
+made available, we reproduce a simulation of structural change tests 
+of \cite{repro:Ploberger+Kraemer:1992}.  They compared their CUSUM test based on
+OLS residuals with the standard CUSUM test based on recursive residuals,
+showing that neither has power against orthogonal shifts. Here, we
+follow their simulation setup, but to make it a little more satisfying methodologically
+(and cheaper to compute) we also compare the OLS-based CUSUM test
+to the Nyblom-Hansen test \citep{repro:Nyblom:1989,repro:Hansen:1992}
+which is consistent for orthogonal changes.
+
+The simulation setup considered by
+\cite{repro:Ploberger+Kraemer:1992} is quite simple, and very clearly described.
+They consider a linear regression model
+with a constant and an alternating regressor $x_t = (1, (-1)^t)$ ($t = 1, \dots, T$),
+independent standard normal errors, and a single shift in the regressor coefficients from
+$\beta$ to $\beta + \Delta$ at time $T^* = z^* T$. In the simulation, they vary the intensity
+$b$, the timing $z^*$ and the angle $\psi$ of the shift as given by
+$\Delta = b/\sqrt{T} (\cos \psi, \sin \psi)$,
+corresponding to their Equation~35. They give sequences of values for all three parameters
+and simulate power for a sample size of $T = 120$ from $N = 1,000$ runs at 5\% significance
+level. This is a rather good description of the DGP, only two very small pieces of 
+information are missing: $\beta$ was left unspecified (presumably because the tests are invariant
+to it) and it is not completely clear whether the observation $T^*$ (if it is an integer) belongs
+to the first or second regime. Given the design of their previous simulation in their Equations~33
+and 34, it probably should belong to the second regime. However, we will place it in the first
+regime so that $z^* = 0.5$ corresponds to two segments of equal size.
+
+To turn their simulation design into modular and easily re-usable code, we split it into
+three functions that capture the most important conceptual steps: (1)~the DGP that simulates
+a data set for a given scenario, (2)~a function that evaluates the tests on this DGP by
+power simulations, (3)~a wrapper function that runs a loop over all scenarios of interest
+using the previous two functions. For step~(1), we define a function \code{dgp()} in
+\proglang{R}.
+
+%% change R input layout for function definitions
+%% (switch off prompts and italics)
+<<prompt1, echo=FALSE, results=hide>>=
+options(prompt = "   ", continue = "   ")
+@
+\DefineVerbatimEnvironment{Sinput}{Verbatim}{}
+
+<<sim-dgp>>=
+dgp <- function(nobs = 100, angle = 0, intensity = 10, timing = 0.5,
+  coef = c(0, 0), sd = 1)
+{
+  coef <- rep(coef, length.out = 2)
+  delta <- intensity/sqrt(nobs) * c(cos(angle * pi/180), sin(angle * pi/180))
+  err <- rnorm(nobs, sd = sd)
+  x <- rep(c(-1, 1), length.out = nobs)
+  y <- ifelse(seq(along = x)/nobs <= timing,
+         coef[1] + coef[2] * x + err,
+	 (coef[1] + delta[1]) + (coef[2] + delta[2]) * x + err)
+  return(data.frame(y = y, x = x))
+}
+@
+
+This is a concise code description of the DGP described verbally above which can
+now be employed to apply the test procedures of interest to data frames resulting
+from \code{dgp()}.
+Based on this, we can define the function \code{testpower()} for (2) that takes the 
+number of replications and the size of the test as its main parameters. Furthermore,
+by using the \code{...} notation in \proglang{R} all arguments used previously
+for \code{dgp()} can simply be passed on. We provide functionality for evaluating
+the tests of interest, the OLS-based CUSUM test and the Nyblom-Hansen test, as well
+as the recursive CUSUM test considered by \cite{repro:Ploberger+Kraemer:1992}.
+All tests are available in the
+\pkg{strucchange} package \citep{repro:Zeileis+Leisch+Hornik:2002,repro:Zeileis:2006a}.
+
+<<sim-power>>=
+testpower <- function(nrep = 100, size = 0.05,
+  test = c("Rec-CUSUM", "OLS-CUSUM", "Nyblom-Hansen"), ...)
+{
+  pval <- matrix(rep(NA, length(test) * nrep), ncol = length(test))
+  colnames(pval) <- test
+  for(i in 1:nrep) {
+    dat <- dgp(...)
+    compute_pval <- function(test) {
+      test <- match.arg(test, c("Rec-CUSUM", "OLS-CUSUM", "Nyblom-Hansen"))
+      switch(test,
+      "Rec-CUSUM" = sctest(efp(y ~ x, data = dat, type = "Rec-CUSUM"))$p.value,
+      "OLS-CUSUM" = sctest(efp(y ~ x, data = dat, type = "OLS-CUSUM"))$p.value,
+      "Nyblom-Hansen" = sctest(gefp(y ~ x, data = dat, fit = lm),
+        functional = meanL2BB)$p.value)
+    }
+    pval[i,] <- sapply(test, compute_pval)
+  }
+  return(colMeans(pval < size))
+}
+@
+
+The function simply runs a loop of length \code{nrep}, computes $p$-values for
+the tests specified and finally computes the empirical power at level \code{size}.
+
+In step~(3), a wrapper function \code{simulation()} is defined that
+evaluates \code{testpower()} for all combinations of the simulation parameters,
+by default setting them to $b = 0, 2.5, 5, 7.5, 10$, $z^* = 0.25, 0.5$, 
+$\psi = 0, 45, 90$ for $T = 100$ and $N = 100$ using only the OLS-based CUSUM test 
+and the Nyblom-Hansen test. This is a coarser grid as compared to \cite{repro:Ploberger+Kraemer:1992}
+with fewer replications which are sufficient for illustration here. The function
+\code{simulation()} first expands the grid of all parameter combinations, then
+calls \code{testpower()} for each of them (which in turn calls \code{dgp()})
+and then re-arranges the data in a data frame.
+
+<<sim-simulation>>=
+simulation <- function(intensity = seq(from = 0, to = 10, by = 2.5),
+  timing = c(0.25, 0.5), angle = c(0, 45, 90),
+  test = c("OLS-CUSUM", "Nyblom-Hansen"), ...)
+{
+  prs <- expand.grid(intensity = intensity, timing = timing, angle = angle)
+  nprs <- nrow(prs)
+  ntest <- length(test)
+
+  pow <- matrix(rep(NA, ntest * nprs), ncol = ntest)
+  for(i in 1:nprs) pow[i,] <- testpower(test = test, intensity =
+    prs$intensity[i], timing = prs$timing[i], angle = prs$angle[i], ...)
+
+  rval <- data.frame()
+  rval <- for(i in 1:ntest) rval <- rbind(rval, prs)
+  rval$test <- gl(ntest, nprs, labels = test)
+  rval$power <- as.vector(pow)
+  rval$timing <- factor(rval$timing)
+  rval$angle <- factor(rval$angle)
+  return(rval)
+}
+@
+
+%% change R input layout for function definitions
+%% (switch back to original behavior for 'interactive' sessions)
+<<prompt2, echo=FALSE, results=hide>>=
+options(prompt = "R> ", continue = "+  ")
+@
+\DefineVerbatimEnvironment{Sinput}{Verbatim}{fontshape=sl}
+
+Modular tools are extremely valuable when setting out to reproduce portions of
+a simulation study. They convey clearly what steps were carried out, the DGP
+could be re-used for evaluating other structural change tests, or the tests could
+be re-used on new DGPs. With these tools available, the main simulation amounts to
+loading the \pkg{strucchange} package, setting a random seed and executing
+\code{simulation()}.\footnote{The parameters have been chosen such that you can
+interactively run the code, possibly while grabbing a coffee (or another beverage of
+your choice) and the simulation results would be ready when you return.}
+
+<<sim-run, eval=FALSE>>=
+library("strucchange")
+set.seed(1090)
+sc_sim <- simulation()
+@
+
+%% store results of simulation if cleanup == FALSE
+%% so that the analysis does not have to be re-run each time
+%% the document is compiled
+<<sim-run1, echo=FALSE>>=
+if(file.exists("sc_sim.rda")) load("sc_sim.rda") else {
+<<sim-run>>
+save(sc_sim, file = "sc_sim.rda")
+}
+if(cleanup) file.remove("sc_sim.rda")
+@
+
+With a small simulation study as this one, we would generally only
+store the code and the outcome object \code{sc\_sim}. For more complex simulations,
+it might make sense to store some intermediate results as well, e.g., the simulated
+data sets. Given the outcome \code{sc\_sim}, it would then be easy for readers
+to replicate the table of simulated power curves, e.g. via
+
+<<sim-table>>=
+tab <- xtabs(power ~ intensity + test + angle + timing, data = sc_sim)
+ftable(tab, row.vars = c("angle", "timing", "test"), col.vars = "intensity")
+@
+
+which produces a flat table \code{ftable()} from the cross-tabulation \code{xtabs()}.
+The resulting table compares the power curves (over columns corresponding to intensity) for the two
+tests (nested last in the rows) given angle and timing. Instead of inspecting this
+table, the differences between the two tests can be brought out even more clearly
+by displaying the table in a trellis (or lattice) type layout, using the same nesting structure
+as above. In \proglang{R}, we use the \pkg{lattice} package \citep{repro:Sarkar:2002} for
+producing Figure~\ref{fig:sim}.
+
+<<sim-plot, eval=FALSE>>=
+library("lattice")
+xyplot(power ~ intensity | angle + timing, groups = ~ test,
+  data = sc_sim, type = "b")
+@
+
+\setkeys{Gin}{width=\textwidth}
+\begin{figure}[t]
+\begin{center}
+<<sim-plot1, echo=FALSE, fig=TRUE, height=6, width=8>>=
+trellis.par.set(theme = canonical.theme(color = FALSE))
+print(xyplot(power ~ intensity | angle + timing, groups = ~ test, data = sc_sim, type = "b"))
+@
+\caption{\label{fig:sim} Simulated size and power for OLS-based CUSUM test (solid)
+  and Nyblom-Hansen test (dashed)}
+\end{center}
+\end{figure}
+
+This shows rather clearly that only for shifts in the intercept (i.e., angle $0$),
+the OLS-based performs very slightly better than the Nyblom-Hansen test, but dramatically
+loses power with increasing angle, being completely insensitive to orthogonal changes in
+slope only (i.e., angle $90$).
+The Nyblom-Hansen test, however, performs similar for all angles. Tests in the middle of the
+sampling period are easier to detect for both tests.\footnote{These findings are 
+not simply artefacts of using $N = 100$ replications. The results from a larger, 
+$N = 10,000$, experiment that we conducted reveal them even more clearly 
+and additionally shows that the
+OLS-based CUSUM test is somewhat conservative while the Nyblom-Hansen test is not.}
+All results are roughly consistent with Table~II(b) in \cite{repro:Ploberger+Kraemer:1992}
+although we have reduced many of the parameters for the sake of obtaining an almost
+interactive example. For obtaining a table with exactly the same setting as in the
+original study:
+
+<<pk-sim, eval=FALSE>>=
+set.seed(1090)
+pk_sim <- simulation(nobs = 120, nrep = 100,
+  intensity = seq(4.8, 12, by = 2.4), timing = seq(0.1, 0.9, by = 0.2),
+  angle = seq(0, 90, by = 18), test = c("Rec-CUSUM", "OLS-CUSUM"))
+ftable(xtabs(power ~ intensity + test + angle + timing, data = pk_sim),
+  row.vars = c("test", "timing", "intensity"), col.vars = "angle")
+@
+
+This code yields results that are not exactly identical (because we cannot
+obtain exactly the same random numbers, and \code{nrep = 1000} still allows
+for considerable variation),
+but they are clearly recognizable, leading to qualitatively equivalent conclusions.
+
+\section{Challenges and Conclusions} \label{sec:challenges}
+
+From an economic perspective, the real challenge of reproducible econometric
+research lies in restructuring incentives to encourage better archiving and
+distribution of the gory details of computationally oriented research.
+Technical progress in software and computer networking have dramatically lowered
+the cost of reproducibility, but without stronger incentives from journals and
+research funding agencies, further progress can be expected to be slow.
+The JAE is exemplary in this respect since it has strongly encouraged data/software
+archiving as well as replication studies.  It would be excellent if other journals
+followed this lead.  Authors ultimately need to be convinced that it is in their
+interest to provide detailed protocols for the computational aspects of their work.
+This may require a sea change in attitudes about acknowledgment and citation 
+practices.
+
+Further technical progress can be expected in all of the realms we have reviewed:
+more convenient archiving and version control, better tools for literate programming,
+improved algorithms and user interfaces for statistical computing are all under active
+development.  More rapid  diffusion of this new technology is what is really needed.
+
+Web-based ``electronic appendices'' are increasingly common and this too is a welcome
+development. However, further pressure by the journals, a better understanding
+of the corresponding required quality standards by the scientific community, as well as
+simplified automatic access would be very valuable.  
+We are still far away from the Claerbout Principle, but good models do exist.  
+WaveLab of \cite{repro:Buckheit+Donoho:1995} is a relatively early example,
+the concept of a \emph{data compendium} suggested by \cite{repro:Gentleman+TempleLang:2007}
+is another. Within economics there has been some discussion and evaluation of the
+archival policies of the \emph{American Economic Review} and \emph{Journal of Money, Credit and Banking}
+\citep[see][]{repro:McCullough+Vinod:2003,repro:McCullough+McGeary+Harrison:2006},
+but much more is needed.
+
+\section{Computational Details} \label{sec:computational}
+
+Our results were obtained using 
+\proglang{R}~\Sexpr{paste(R.Version()[6:7], collapse = ".")}---with the packages
+\pkg{lmtest}~\Sexpr{get_version("lmtest")}, \pkg{sandwich}~\Sexpr{get_version("sandwich")},
+\pkg{MASS}~\Sexpr{get_version("MASS")}, \pkg{strucchange}~\Sexpr{get_version("strucchange")},
+and \pkg{lattice}~\Sexpr{get_version("lattice")}---and
+were identical on various platforms including PCs running Debian GNU/Linux (with a
+2.6.18 kernel) and Mac OS X, version~10.4.10. 
+The full sources for this document (including data, \proglang{R} code and {\LaTeX} sources)
+are available from \url{http://www.econ.uiuc.edu/~roger/research/repro/}. Hence, readers
+can do as we do, not as we say, and fully reproduce our analyses.
+
+
+\bibliography{repro}
+
+\end{document}
