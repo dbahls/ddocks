@@ -1,0 +1,54 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+	<head>
+		<variable name='val1321'/>
+		<variable name='val1322'/>
+		<variable name='val1323'/>
+		<variable name='val1324'/>
+		<variable name='val1325'/>
+		<variable name='val1326'/>
+		<variable name='val1327'/>
+		<variable name='val1328'/>
+		<variable name='val1329'/>
+		<variable name='val1330'/>
+		<variable name='val1331'/>
+	</head>
+	<results>
+		<result>
+			<binding name='val1324'>
+				<literal>0.0</literal>
+			</binding>
+			<binding name='val1323'>
+				<literal>0.0</literal>
+			</binding>
+			<binding name='val1326'>
+				<literal>2544.0</literal>
+			</binding>
+			<binding name='val1325'>
+				<literal>1781.0</literal>
+			</binding>
+			<binding name='val1331'>
+				<literal>29.0</literal>
+			</binding>
+			<binding name='val1322'>
+				<literal>1.0</literal>
+			</binding>
+			<binding name='val1330'>
+				<literal>1.50</literal>
+			</binding>
+			<binding name='val1321'>
+				<literal>121</literal>
+			</binding>
+			<binding name='val1328'>
+				<literal>2.10</literal>
+			</binding>
+			<binding name='val1327'>
+				<literal>3.50</literal>
+			</binding>
+			<binding name='val1329'>
+				<literal>16.20</literal>
+			</binding>
+		</result>
+	</results>
+</sparql>
+

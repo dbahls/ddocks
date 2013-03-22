@@ -1,0 +1,14 @@
+Package: ddocks
+Version: 0.1.0
+Date: 2013-03-20
+Title: ddocks
+Author: Daniel Bahls (ZBW) and Benjamin Zapilko (GESIS)
+Maintainer: Daniel Bahls <d.bahls@zbw.eu>
+Description: 'data docks' is a module for data set reconstruction 
+License: GPL (>= 2)
+Depends:
+    stringr
+    SPARQL
+Suggests:
+Collate:
+    'ddocks.R'
