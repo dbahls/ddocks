@@ -1,2 +1,2 @@
-export(hello_world)
-export(hello_world_alternative)
+export(ddocks_get)
+
