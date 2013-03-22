@@ -27,6 +27,9 @@ idsbyns <- new.env(hash=T, parent=emptyenv())
 
 id2values <- new.env(hash=T, parent=emptyenv())
 
+tmpltBody  = list()		# the template without header  (a list of lines)
+datasetStr = list()		# final data set string        (a list of lines)
+
 
 
 
@@ -83,6 +86,7 @@ while (length(line <- readLines(con, n = 1, warn = FALSE)) > 0) {
 		print(paste("tokens: ", tokenOpen, tokenClose,sep = " ", collapse = NULL))
 		
 	}
+	
 } 
 
 
@@ -112,30 +116,44 @@ print("processing body...")
 # organize them by repository, so we can generate one query per repository to request the values
 #
 regex = sprintf("%s.*?%s", tokenClose, tokenOpen)
-while (length(line <- readLines(con, n = 1, warn = FALSE)) > 0) {
+repeat {
+
+	print(sprintf("processing line: %s", line))
+	
+	# store line in memory
+	tmpltBody = c(tmpltBody, line)
 	
 	#print(paste("new line: ", line))
 	res <- str_split(line, regex)
-
-	# weird parsing.... but works 
-	for (id in res[[1]]) {
-		id = sub(sprintf(".*%s", tokenOpen), "", id)
-		id = sub(sprintf("%s.*", tokenClose), "", id)
+	#print(length(res[[1]]))
+	if (length(res[[1]])>1) {
 		
-		# todo: what if the full URI is given, not using namespace? nasty workaround required?
-		# also not fail-safe yet (array index)
-		ns = str_match(id, "([[:graph:]]+)\\:")[2]
-
-		idsbyns[[ns]] = c(idsbyns[[ns]], id)
-	}
+		# weird parsing.... but works 
+		for (id in res[[1]]) {
+			id = sub(sprintf(".*%s", tokenOpen), "", id)
+			id = sub(sprintf("%s.*", tokenClose), "", id)
+			
+			# todo: what if the full URI is given, not using namespace? nasty workaround required?
+			# also not fail-safe yet (array index)
+			ns = str_match(id, "([[:graph:]]+)\\:")[2]
+			
+			print(sprintf("found id [%s] for ns [%s]", id, ns))
 	
+			idsbyns[[ns]] = c(idsbyns[[ns]], id)
+		}
+	}	
+
 	
 	#res <- grep(regex, line, value=TRUE)
 	#res <- str_match(line, regex)
 	
 	#print("match")
 	#print(res)
-}
+	
+	
+	if (length(line <- readLines(con, n = 1, warn = FALSE)) <= 0) break
+	
+} 
 
 
 #
@@ -177,29 +195,57 @@ for (ns in ls(idsbyns)) {
 		queryBuffer = c(queryBuffer, "}")
 		q = paste(queryBuffer, collapse="\n", sep="")
 		
-		cat(q)
-		fileConn<-file("query.txt")
-		writeLines(q, fileConn)
-		close(fileConn)
+		#cat(q)
+		#fileConn<-file("query.txt")
+		#writeLines(q, fileConn)
+		#close(fileConn)
 		
 		# run this query against the sparql endpoint for the given namespace
 		d <- SPARQL(url=endpoint, q, extra=list(resultFormat="xml"), ns=c("demoArchive", "http://demoarchive.demo/", "rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#"))
 		res <- d$results
-
-		print(res)
+		#print(res)
 		
+		# bind results in id2values map
+		for (vname in colnames(res)) {
+			
+			i= as.integer(str_match(vname, "\\d+"))
+			id=tmpIDs[[i]]
+			
+			val = res[vname]
+			#print(sprintf("%s <- %s", vname, val))
 		
-		#print(typeof(res))
-		#print(length(res))
+			id2values[[id]] = val
+			
+		}
 		
 	}
 	
 }
 
 
+#
+# eventually create data set with the actual values
+#
+body = paste(tmpltBody, collapse="\n", sep="")
+#print(tmpltBody)
+
+print(length(ls(id2values)))
+for (id in ls(id2values)) {
+	
+	print(sprintf("replace id <%s> with value [%s]", id, id2values[[id]]))
+	
+	
+	body = gsub(sprintf("<%s>", id), id2values[[id]], body, fixed=TRUE)
+	
+}
+#print(body)
+
+#cat(body)
 
 
-
+fileConn<-file("reconstructed.txt")
+writeLines(body, fileConn)
+close(fileConn)
 
 
 close(con)
