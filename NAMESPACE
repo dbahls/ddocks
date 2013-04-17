@@ -1,2 +1,2 @@
-export(ddocks_get)
+export(ddocks_restore)
 

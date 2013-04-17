@@ -3,31 +3,67 @@
 #
 library(ddocks)
 
+#
+# test for data set 1
+#
 
-#dsname  = "data.dj"
+dsname  = "data.dj"
+
+# use local template file
+#path = sprintf("samples/koenkerzeileis09/%s.ddocks", dsname)
+#con  = file(path, open = "r")
+
+# use remote template file
+uri  = sprintf("http://mawifo.zbw.eu/_static/%s.ddocks", dsname)
+con  = url(uri)
+
+# restore data set
+ds <- ddocks_restore(con)
+
+# compare original with restored
+urlOriginal = "http://www.econ.uiuc.edu/~roger/research/repro/data.dj"
+orig <- paste0(readLines(url(urlOriginal)), collapse="\n")
+
+print(sprintf("[%s] original = restored? %s", dsname, (ds==orig)))
+
+#fileConn<-file("tmp-data.txt")
+#writeLines(ds, fileConn)
+#close(fileConn)
+
+
+#
+# test for data set 2
+#
+
 dsname  = "rk.raw"
 
+# use local template file
+#path = sprintf("samples/koenkerzeileis09/%s.ddocks", dsname)
+#con  = file(path, open = "r")
 
-print("reconstruct data set by template")
-ds = ddocks_get(file(sprintf("samples/koenkerzeileis09/generated/%s.ddocks", dsname), open = "r"))
+# use remote template file
+uri  = sprintf("http://mawifo.zbw.eu/_static/%s.ddocks", dsname)
+con  = url(uri)
 
-fileConn<-file("tmp-data.txt")
-writeLines(ds, fileConn)
-close(fileConn)
+# restore data set
+ds <- ddocks_restore(con)
+
+# compare original with restored
+urlOriginal = "http://www.econ.uiuc.edu/~roger/research/repro/rk.raw"
+orig <- paste0(readLines(url(urlOriginal)), collapse="\n")
+
+print(sprintf("[%s] original = restored? %s", dsname, (ds==orig)))
 
 
 
 
-print("read original data set")
-fileName <- sprintf("samples/koenkerzeileis09/%s", dsname)
-orig = readChar(fileName, file.info(fileName)$size)
+
+#fileConn<-file("tmp-data.txt")
+#writeLines(ds, fileConn)
+#close(fileConn)
 
 
-# matches?
-# false, because of missing new line char in last line... 
-print(sprintf("both files match? %s", orig==ds))
 
-cat(ds)
-#cat(orig)
 
-print("")
+
+
