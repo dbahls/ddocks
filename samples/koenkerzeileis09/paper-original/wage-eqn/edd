@@ -1,1 +1,0 @@
-sed -f j.s data.raw |awk -f s.a |tr "dhguwbmc," "12345133  " >data
