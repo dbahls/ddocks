@@ -9,9 +9,3 @@ install.packages("C:\\data\\workspace-juno\\ddocks", repos=NULL, type="source")
 library(ddocks)
 
 
-
-run test
------------
-source("testcases/testReconstructDataset.R")
-
-
