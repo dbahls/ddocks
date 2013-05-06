@@ -3,17 +3,9 @@ library(stringr)
 library(SPARQL)
 
 
-
-#' Reconstruct data set by template
-#'
-#' @param con Connection (file, pipe, url,...) to a ddocks data template
-#' @return character reconstructed data set
-#'
-#' @examples
-#' ddocks_get(file("samples/koenkerzeileis09/generated/data.dj.ddocks", open = "r"))
-#'
-#' @author daniel
-#' @export
+#
+# Reconstruct data set by data template
+#
 ddocks_restore <- function(con, targetfile){
 	
 	if (file.exists(targetfile)) return()

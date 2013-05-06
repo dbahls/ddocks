@@ -1,0 +1,12 @@
+
+install package from source:
+------------------------------
+
+install.packages("path-to-ddocks-src/", repos=NULL, type="source")
+
+
+load library:
+------------------------------
+library(ddocks)
+
+
